@@ -41,6 +41,7 @@ class TorchPointCloudRenderer:
         use_fp16_cache: bool = True,
         axis_flip: Optional[np.ndarray] = None,
         max_points: Optional[int] = None,
+        splat_radius: int = 0,
     ) -> None:
         self.width = int(width)
         self.height = int(height)
@@ -52,6 +53,7 @@ class TorchPointCloudRenderer:
         if self.mode not in ("fast", "softmin"):
             raise ValueError("mode must be: fast or softmin")
         self.use_fp16_cache = bool(use_fp16_cache)
+        self.splat_radius = max(0, int(splat_radius))
 
         xyz = np.asarray(points_xyz, dtype=np.float32)
         rgb = np.asarray(points_rgb, dtype=np.float32)
@@ -183,6 +185,9 @@ class TorchPointCloudRenderer:
             depth = depth_flat.view(H, W)
             depth = torch.where(torch.isfinite(depth), depth, torch.zeros_like(depth))
 
+        if self.splat_radius > 0:
+            rgb_img, depth = self._apply_splat_radius(rgb_img, depth, self.splat_radius)
+
         if return_torch:
             return RenderOutputTorch(rgb_u8=rgb_img, depth_f32=depth)
         return RenderOutput(
@@ -206,3 +211,60 @@ class TorchPointCloudRenderer:
         )
         assert isinstance(out, RenderOutputTorch)
         return out
+
+    @staticmethod
+    def _apply_splat_radius(
+        rgb_img: torch.Tensor,
+        depth: torch.Tensor,
+        radius: int,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Grow rendered pixels into a disk while preserving nearest depth.
+
+        This is applied after one-pixel z-buffer splatting. It fills nearby
+        holes from the visible surface pixels and uses a local z-buffer when
+        grown disks overlap.
+        """
+        r = max(0, int(radius))
+        if r <= 0:
+            return rgb_img, depth
+        H, W = int(depth.shape[0]), int(depth.shape[1])
+        rgb_src = rgb_img.clone()
+        depth_src = depth.clone()
+        rgb_out = rgb_img.clone()
+        depth_out = depth.clone()
+
+        offsets = []
+        rr = r * r
+        for dy in range(-r, r + 1):
+            for dx in range(-r, r + 1):
+                if dx == 0 and dy == 0:
+                    continue
+                d2 = dx * dx + dy * dy
+                if d2 <= rr:
+                    offsets.append((d2, dy, dx))
+        offsets.sort()
+
+        for _, dy, dx in offsets:
+            src_y0 = max(0, -dy)
+            src_y1 = H - max(0, dy)
+            dst_y0 = max(0, dy)
+            dst_y1 = H - max(0, -dy)
+            src_x0 = max(0, -dx)
+            src_x1 = W - max(0, dx)
+            dst_x0 = max(0, dx)
+            dst_x1 = W - max(0, -dx)
+            if src_y1 <= src_y0 or src_x1 <= src_x0:
+                continue
+
+            src_d = depth_src[src_y0:src_y1, src_x0:src_x1]
+            dst_d = depth_out[dst_y0:dst_y1, dst_x0:dst_x1]
+            update = (src_d > 0) & ((dst_d == 0) | (src_d < dst_d))
+            if not update.any():
+                continue
+
+            depth_out[dst_y0:dst_y1, dst_x0:dst_x1] = torch.where(update, src_d, dst_d)
+            src_rgb = rgb_src[src_y0:src_y1, src_x0:src_x1]
+            dst_rgb = rgb_out[dst_y0:dst_y1, dst_x0:dst_x1]
+            rgb_out[dst_y0:dst_y1, dst_x0:dst_x1] = torch.where(update[..., None], src_rgb, dst_rgb)
+
+        return rgb_out, depth_out

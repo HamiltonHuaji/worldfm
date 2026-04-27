@@ -1,6 +1,28 @@
-from mmengine.registry import Registry
-
 from worldfm.diffusion.model.utils import set_grad_checkpoint
+
+
+class Registry:
+    """Small inference-time registry compatible with the local model decorators."""
+
+    def __init__(self, name):
+        self.name = name
+        self._modules = {}
+
+    def register_module(self, name=None):
+        def _wrap(cls):
+            self._modules[name or cls.__name__] = cls
+            return cls
+        return _wrap
+
+    def build(self, cfg, default_args=None):
+        cfg = dict(cfg)
+        default_args = dict(default_args or {})
+        type_name = cfg.pop('type')
+        if type_name not in self._modules:
+            raise KeyError(f'{type_name!r} is not registered in {self.name}')
+        args = {**default_args, **cfg}
+        return self._modules[type_name](**args)
+
 
 MODELS = Registry('models')
 

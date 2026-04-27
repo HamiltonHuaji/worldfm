@@ -98,7 +98,7 @@ def build_condition_db(
         P_list.append(torch.from_numpy(_P_from_K_c2w(K_use, fr.c2w_4x4)).to(device=device))
         C_list.append(torch.from_numpy(_as_4x4(fr.c2w_4x4)[:3, 3].astype(np.float32)).to(device=device))
 
-        out_t = torch_renderer.render_torch(K_3x3=fr.K_3x3, c2w_4x4=fr.c2w_4x4, c2w_is_camera_to_world=True)
+        out_t = torch_renderer.render_torch(K_3x3=K_use, c2w_4x4=fr.c2w_4x4, c2w_is_camera_to_world=True)
         depth_list.append(out_t.depth_f32)
 
     if not cond_paths:
@@ -149,7 +149,7 @@ def build_condition_db_in_memory(
         K_use = scale_K_for_resize(fr.K_3x3, src_wh=(fr.width, fr.height), dst_wh=(width, height))
         P_list.append(torch.from_numpy(_P_from_K_c2w(K_use, fr.c2w_4x4)).to(device=device))
         C_list.append(torch.from_numpy(_as_4x4(fr.c2w_4x4)[:3, 3].astype(np.float32)).to(device=device))
-        out_t = torch_renderer.render_torch(K_3x3=fr.K_3x3, c2w_4x4=fr.c2w_4x4, c2w_is_camera_to_world=True)
+        out_t = torch_renderer.render_torch(K_3x3=K_use, c2w_4x4=fr.c2w_4x4, c2w_is_camera_to_world=True)
         depth_list.append(out_t.depth_f32)
 
     return ConditionDB(

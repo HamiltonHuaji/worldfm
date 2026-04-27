@@ -75,6 +75,80 @@ Use `--step 1` or `--step 2` in `run_pipeline.py` to select the corresponding mo
 
 ## Usage
 
+### Headless WorldFM From an Existing Point Cloud
+
+This fork includes a lightweight path that skips HunyuanWorld, MoGe, Real-ESRGAN,
+ZIM, `mmcv`, and `mmengine`. It is intended for server deployment where you
+already have a colored point cloud, camera intrinsics/poses, and source frames.
+
+The expected scene layout is:
+
+```
+scene_dir/
+  points/point_cloud.ply
+  images/000000.png                 # resized frames matching intri.yml
+  runtime/extracted_frames/000000.jpg  # original frames used as reference cond2
+  intri.yml
+  extri.yml                         # OpenCV camera-to-world matrices
+```
+
+Launch the browser demo:
+
+```bash
+python demo_ply_worldfm_web.py \
+  --scene_dir <SCENE_DIR> \
+  --host 0.0.0.0 \
+  --port 7860 \
+  --step 2 \
+  --splat_radius 2
+```
+
+Open `http://<server-ip>:7860/`. If the server is only reachable through SSH:
+
+```bash
+ssh -L 7860:127.0.0.1:7860 <user>@<server>
+```
+
+Then open `http://127.0.0.1:7860/` locally.
+
+The web view shows `point-cloud splat input | WorldFM output`. With
+`--debug_panel`, it shows `point-cloud splat input | selected source frame |
+WorldFM output`.
+
+Controls: `WASD` move, `QE` vertical move, mouse drag looks around, `IJKL`
+rotates, `R` snaps to the nearest source pose, and `P` saves the current frame.
+
+### Optional: Build the Scene With Pi3X
+
+For higher-quality geometry from a video, this fork can call a sibling Pi3/Pi3X
+checkout and export a WorldFM-ready scene. Pi3X is strong but memory-heavy, so
+the exporter samples at most 16 frames.
+
+```bash
+git clone git@github.com:yyfz/Pi3.git ../Pi3
+
+python export_pi3x_worldfm.py \
+  --video_path ../../benchmarks/ict_5floor_panorama.mp4 \
+  --output_dir ../../outputs/ict_5floor/pi3x \
+  --pi3_root ../Pi3 \
+  --max_frames 16 \
+  --force
+```
+
+Then run:
+
+```bash
+python demo_ply_worldfm_web.py \
+  --scene_dir ../../outputs/ict_5floor/pi3x \
+  --host 0.0.0.0 \
+  --port 7860 \
+  --step 2 \
+  --splat_radius 2
+```
+
+`demo_ply_worldfm.py` provides the same interaction through an OpenCV desktop
+window, but `demo_ply_worldfm_web.py` is the recommended server entry point.
+
 ### Demo
 
 We provide a sample scene with a pre-defined camera trajectory in `demo/`. Run the following command to generate an MP4 video along the trajectory:
