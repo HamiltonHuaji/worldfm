@@ -31,15 +31,16 @@ from demo_ply_worldfm import (
     WorldFMTriConditionInprocess,
     _build_condition_db_from_source_frames,
     _decode_worldfm_output,
-    _default_model_path,
     _load_points,
     _load_source_cameras,
     _make_debug_panel,
     _make_input_output_panel,
+    _model_ref_from_arg,
     _move_camera,
     _nearest_source_index,
     _resolve,
     _rotate_camera_local,
+    _vae_ref_from_arg,
     build_parser as build_base_parser,
 )
 from modules.transforms_io import scale_K_for_resize
@@ -242,8 +243,8 @@ class WebWorldFMEngine:
             device=self.device,
         )
 
-        model_path = _resolve(args.model_path) if args.model_path else _default_model_path(int(args.step)).resolve()
-        vae_path = _resolve(args.vae_path)
+        model_path = _model_ref_from_arg(args.model_path, int(args.step))
+        vae_path = _vae_ref_from_arg(args.vae_path)
         self.svc = WorldFMTriConditionInprocess(
             WorldFMInprocessConfig(
                 model_path=str(model_path),

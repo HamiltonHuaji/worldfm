@@ -71,7 +71,29 @@ def _resolve(path: str | Path) -> Path:
 
 def _default_model_path(step: int) -> Path:
     ckpt_step = 1 if int(step) == 1 else 2
-    return WORLDFM_ROOT / "weights" / f"worldfm_{ckpt_step}-step.pth"
+    return Path(f"worldfm_{ckpt_step}-step.pth")
+
+
+def _model_ref_from_arg(value: str, step: int) -> str:
+    if not value:
+        return str(_default_model_path(step))
+    local = Path(value).expanduser()
+    if local.exists():
+        return str(_resolve(value))
+    if "/" in value and ":" not in value and not value.startswith("hf://"):
+        ckpt_step = 1 if int(step) == 1 else 2
+        return f"{value}:worldfm_{ckpt_step}-step.pth"
+    return value
+
+
+def _vae_ref_from_arg(value: str) -> str:
+    value = value or "vae"
+    local = Path(value).expanduser()
+    if local.exists():
+        return str(_resolve(value))
+    if "/" in value and ":" not in value and not value.startswith("hf://"):
+        return f"{value}:vae"
+    return value
 
 
 def _parse_opencv_matrix_yml(path: Path, node_name: str) -> tuple[list[str], dict[str, np.ndarray]]:
@@ -497,8 +519,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--step", type=int, default=2,
                    help="WorldFM sampling steps. 1/2 use DMD fast path; larger values use DPM solver.")
     p.add_argument("--model_path", type=str, default="",
-                   help="WorldFM checkpoint. Defaults to weights/worldfm_1-step.pth for --step=1, otherwise weights/worldfm_2-step.pth")
-    p.add_argument("--vae_path", type=str, default="weights/vae")
+                   help="Local checkpoint or HF ref. Defaults to worldfm_1-step.pth for --step=1, otherwise worldfm_2-step.pth from inspatio/worldfm cache.")
+    p.add_argument("--vae_path", type=str, default="vae",
+                   help="Local VAE dir or HF ref. Defaults to vae from inspatio/worldfm cache.")
     p.add_argument("--version", type=str, default="sigma", choices=["sigma", "alpha"])
     p.add_argument("--cfg_scale", type=float, default=4.5)
     p.add_argument("--gpu_index", type=int, default=0)
@@ -585,8 +608,8 @@ def main() -> int:
         device=device,
     )
 
-    model_path = _resolve(args.model_path) if args.model_path else _default_model_path(int(args.step)).resolve()
-    vae_path = _resolve(args.vae_path)
+    model_path = _model_ref_from_arg(args.model_path, int(args.step))
+    vae_path = _vae_ref_from_arg(args.vae_path)
     _log(f"Loading WorldFM: {model_path}")
     svc = WorldFMTriConditionInprocess(
         WorldFMInprocessConfig(

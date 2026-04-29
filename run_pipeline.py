@@ -311,15 +311,22 @@ def step4_init(*, cfg=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     device_str = f"cuda:{torch.cuda.current_device()}" if device.type == "cuda" else "cpu"
 
-    model_p = Path(model_path).resolve()
-    vae_p = Path(vae_path)
-    if not vae_p.is_absolute():
+    if "/" in model_path and ":" not in model_path and not model_path.startswith("hf://"):
+        model_path = f"{model_path}:worldfm_{step if step in (1, 2) else 2}-step.pth"
+    if "/" in vae_path and ":" not in vae_path and not vae_path.startswith("hf://") and not Path(vae_path).exists():
+        vae_path = f"{vae_path}:vae"
+
+    model_p = Path(model_path).expanduser()
+    model_ref = str(model_p.resolve()) if model_p.exists() else model_path
+    vae_p = Path(vae_path).expanduser()
+    if not vae_p.is_absolute() and (WORLDFM_ROOT / vae_p).exists():
         vae_p = (WORLDFM_ROOT / vae_p).resolve()
+    vae_ref = str(vae_p) if vae_p.exists() else vae_path
 
     svc = WorldFMTriConditionInprocess(
         WorldFMInprocessConfig(
-            model_path=str(model_p),
-            vae_path=str(vae_p),
+            model_path=model_ref,
+            vae_path=vae_ref,
             image_size=image_size,
             version=str(wcfg.version),
             disable_cross_attn=True,

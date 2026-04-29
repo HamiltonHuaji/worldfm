@@ -38,7 +38,7 @@ from torchvision.transforms.functional import (
 
 from worldfm.diffusion import DPMS, IDDPM
 from worldfm.diffusion.model.nets import PixArtWorldFM_XL_2, PixArtWorldFMMS_XL_2
-from worldfm.download import find_model
+from worldfm.download import find_model, resolve_vae_path
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +146,7 @@ class WorldFMTriConditionInprocess:
         model.eval().to(cfg.weight_dtype)
         self.model = model
 
-        vae = AutoencoderKL.from_pretrained(cfg.vae_path).to(self.device).to(cfg.weight_dtype)
+        vae = AutoencoderKL.from_pretrained(resolve_vae_path(cfg.vae_path)).to(self.device).to(cfg.weight_dtype)
         vae.eval()
         self.vae = vae
 

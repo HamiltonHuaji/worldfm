@@ -56,7 +56,24 @@ To support reproducibility, users can integrate alternative open-source panorama
 
 ### Download Pretrained Model
 
-Download model checkpoints from [huggingface](https://huggingface.co/inspatio/worldfm) by running:
+By default, this fork resolves WorldFM weights from the HuggingFace cache for
+`inspatio/worldfm`. You do not need to copy checkpoint files into `weights/` if
+the files are already cached by `huggingface_hub`; missing files will be
+downloaded by HuggingFace Hub unless `WORLDFM_HF_LOCAL_ONLY=1` is set.
+
+Supported checkpoint refs:
+
+```bash
+--model_path worldfm_2-step.pth
+--model_path inspatio/worldfm
+--model_path inspatio/worldfm:worldfm_2-step.pth
+--model_path hf://inspatio/worldfm/worldfm_2-step.pth
+--vae_path vae
+--vae_path inspatio/worldfm
+--vae_path inspatio/worldfm:vae
+```
+
+You can still materialize files into `weights/` explicitly:
 
 ```sh
 python download_ckpts.py
